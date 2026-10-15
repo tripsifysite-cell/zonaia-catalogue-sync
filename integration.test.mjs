@@ -20,6 +20,11 @@ for(const scenario of ['bootstrap','changed','unchanged','untrusted','source-fai
       assert.equal(puts.length,['bootstrap','changed'].includes(scenario)?1:0)
       assert.equal(hooks.length,puts.length)
       if(scenario==='unchanged')assert.equal(trace.filter(r=>r.path.includes('/storage/')).length,0)
+      if(scenario==='changed'){
+        const bodies=trace.filter(r=>r.path.startsWith('/rest/')&&r.select!=='id,updated_at')
+        assert.equal(bodies.length,1)
+        assert.equal(bodies[0].path,'/rest/v1/ias')
+      }
       if(scenario==='untrusted')assert.equal(trace.length,0)
       assert.equal((run.stderr+run.stdout).includes('must not appear in logs'),false)
       assert.equal((run.stderr+run.stdout).includes('test-only'),false)

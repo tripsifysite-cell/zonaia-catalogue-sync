@@ -2,6 +2,8 @@
 
 Small standalone scheduled publisher. This repository contains **code and publication hashes only**, not application source, catalogue records, authentication state or credentials.
 
+Schedule: Thursdays at 20:37 UTC (17:37 Argentina), best-effort.
+
 The website remains available from its last successful deployment when refresh fails.
 
 ## Safety boundaries

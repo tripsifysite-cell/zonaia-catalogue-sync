@@ -17,15 +17,16 @@ process.env.BOOTSTRAP=['bootstrap','source-failure','corrupt-roundtrip','upload-
 const timestamp='2026-10-15T00:00:00Z'
 const row=(n)=>({id:n,slug:'sample-'+n,created_at:timestamp,updated_at:timestamp})
 const data={ias:[row(1)],prompts:[row(2)],blog:[row(3)]}
-const inventory=Object.fromEntries(Object.entries(data).map(([k,rows])=>[k,rows.map(r=>({id:r.id,updated_at:r.updated_at}))]))
 const {snapshot,bytes}=encodeSnapshot(data,timestamp)
+if(scenario==='changed')data.ias=[{...row(1),updated_at:'2026-10-16T00:00:00Z'}]
+const inventory=Object.fromEntries(Object.entries(data).map(([k,rows])=>[k,rows.map(r=>({id:r.id,updated_at:r.updated_at}))]))
 const prefix='v1/20261015-1234567890abcdef'
 const manifest={version:1,sha256:digest(bytes),compressedBytes:bytes.length,chunks:[{path:prefix+'/part-0.bin.gz',bytes:bytes.length,sha256:digest(bytes)}]}
 const objects=new Map([[prefix+'/manifest.json',Buffer.from(JSON.stringify(manifest))],[prefix+'/part-0.bin.gz',bytes]])
 const state={version:1,baseline:process.env.BOOTSTRAP!=='true',manifestPath:prefix+'/manifest.json',manifestSha256:digest(Buffer.from(JSON.stringify(manifest))),sourceFingerprint:scenario==='unchanged'?fingerprint(inventory):'0'.repeat(64),history:[]}
 globalThis.fetch=async(input,options={})=>{
   const u=new URL(input),method=options.method||'GET'
-  trace.push({host:u.hostname,path:u.pathname,method})
+  trace.push({host:u.hostname,path:u.pathname,method,select:u.searchParams.get('select')})
   const result=(value,status=200)=>new Response(typeof value==='string'?value:JSON.stringify(value),{status})
   if(u.hostname==='api.github.com'){
     if(method==='PUT')return result({commit:{sha:'next'}})
