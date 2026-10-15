@@ -1,0 +1,39 @@
+name: Controlled catalogue refresh
+on:
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: One-time initial full baseline (never a retry fallback)
+        type: boolean
+        default: false
+  schedule:
+    - cron: '37 11 * * 2'
+permissions:
+  contents: read
+concurrency:
+  group: catalogue-publication
+  cancel-in-progress: false
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/main' && github.repository == 'tripsifysite-cell/zonaia-catalogue-sync'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: catalogue-publisher
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Offline tests before secret-bearing step
+        run: node --test core.test.mjs integration.test.mjs
+      - name: Bounded refresh from reviewed main
+        run: node --max-old-space-size=4096 sync.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BOOTSTRAP: ${{ inputs.bootstrap || false }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CATALOGUE_PUBLISHER_EMAIL: ${{ secrets.CATALOGUE_PUBLISHER_EMAIL }}
+          CATALOGUE_PUBLISHER_PASSWORD: ${{ secrets.CATALOGUE_PUBLISHER_PASSWORD }}
+          PAGES_DEPLOY_HOOK: ${{ secrets.PAGES_DEPLOY_HOOK }}

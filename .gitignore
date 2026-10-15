@@ -1,0 +1,5 @@
+.env*
+tmp/
+*.gz
+*.bin
+node_modules/
