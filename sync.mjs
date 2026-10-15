@@ -31,7 +31,7 @@ try {
   stage='state'
   const stateFile=await json(`${gh}/contents/state.json?ref=state`,ghOptions())
   const state=validatePin(JSON.parse(Buffer.from(stateFile.content,'base64').toString('utf8')))
-  const history=checkBudget(state,now.getTime(),bootstrap)
+  let history=(bootstrap||state.baseline!==true)?checkBudget(state,now.getTime(),bootstrap):null
   stage='authenticate'
   const session=await json(base+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:anon,'Content-Type':'application/json'},body:JSON.stringify({email,password})})
   if(!session.access_token||session.user?.app_metadata?.purpose!=='zonaia_snapshot_publisher')throw Error('PUBLISHER_IDENTITY')
@@ -62,6 +62,7 @@ try {
     if(marker.manifestSha256!==state.manifestSha256)throw Error('PREVIOUS_DEPLOYMENT_PENDING')
     console.log(JSON.stringify({stage:'unchanged',requests,receivedBytes:received,publication:false}));process.exit(0)
   }
+  history ||= checkBudget(state,now.getTime(),bootstrap)
   stage='storage-budget'
   const objects=await json(`${base}/storage/v1/object/list/${bucket}`,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({prefix:'v1',limit:1000,offset:0})})
   // Root listing contains version directories. Enumerate each, without deleting anything.
@@ -140,7 +141,8 @@ try {
   if(latest.sha!==stateFile.sha)throw Error('PUBLICATION_STATE_CHANGED')
   await json(`${gh}/contents/state.json`,ghOptions('PUT',{branch:'state',sha:stateFile.sha,message:'Update validated catalogue publication pin',content:Buffer.from(JSON.stringify(next,null,2)+'\n').toString('base64')}))
   stage='trigger-pages'
-  await request(hook.href,{method:'POST'},1000000)
+  const trigger=await json(hook.href,{method:'POST'},1000000)
+  if(trigger.success===false)throw Error('PAGES_TRIGGER_REJECTED')
   console.log(JSON.stringify({stage:'snapshot-published-build-requested',counts:snapshot.counts,requests,receivedBytes:received,compressedBytes:bytes.length,manifestSha256}))
 } catch(error){
   // Provider response bodies, URLs and arbitrary exception strings may contain secrets.

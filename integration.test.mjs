@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {spawnSync} from 'node:child_process'
 import {mkdtempSync,readFileSync,rmSync} from 'node:fs'
 import {tmpdir} from 'node:os'
-import {join} from 'node:path'
+import {join,dirname,resolve,basename} from 'node:path'
 import {fileURLToPath,pathToFileURL} from 'node:url'
 const here=fileURLToPath(new URL('.',import.meta.url))
 for(const scenario of ['bootstrap','changed','unchanged','untrusted','source-failure','corrupt-roundtrip','upload-failure','storage-full']){
@@ -23,6 +23,9 @@ for(const scenario of ['bootstrap','changed','unchanged','untrusted','source-fai
       if(scenario==='untrusted')assert.equal(trace.length,0)
       assert.equal((run.stderr+run.stdout).includes('must not appear in logs'),false)
       assert.equal((run.stderr+run.stdout).includes('test-only'),false)
-    }finally{rmSync(temp,{recursive:true,force:true})}
+    }finally{
+      if(dirname(resolve(temp))!==resolve(tmpdir())||!basename(temp).startsWith('catalogue-sync-test-'))throw Error('Unsafe temporary cleanup target')
+      rmSync(temp,{recursive:true,force:true})
+    }
   })
 }
