@@ -15,15 +15,18 @@ process.env.CATALOGUE_PUBLISHER_PASSWORD='test-only'
 process.env.PAGES_DEPLOY_HOOK='https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/1234-abcd'
 process.env.BOOTSTRAP=['bootstrap','source-failure','corrupt-roundtrip','upload-failure','storage-full'].includes(scenario)?'true':'false'
 const timestamp='2026-10-15T00:00:00Z'
-const row=(n)=>({id:n,slug:'sample-'+n,created_at:timestamp,updated_at:timestamp})
+const row=(n)=>({id:n,slug:'sample-'+n,created_at:timestamp,updated_at:timestamp,...(n===1?{price:'Gratis',license:'MIT'}:n===2?{license:null}:{})})
 const data={ias:[row(1)],prompts:[row(2)],blog:[row(3)]}
-const {snapshot,bytes}=encodeSnapshot(data,timestamp)
+const baselineData=structuredClone(data)
+if(['metadata-migration','metadata-missing'].includes(scenario)){for(const r of baselineData.ias){delete r.price;delete r.license}for(const r of baselineData.prompts)delete r.license}
+const {snapshot,bytes}=encodeSnapshot(baselineData,timestamp)
 if(scenario==='changed')data.ias=[{...row(1),updated_at:'2026-10-16T00:00:00Z'}]
 const inventory=Object.fromEntries(Object.entries(data).map(([k,rows])=>[k,rows.map(r=>({id:r.id,updated_at:r.updated_at}))]))
 const prefix='v1/20261015-1234567890abcdef'
 const manifest={version:1,sha256:digest(bytes),compressedBytes:bytes.length,chunks:[{path:prefix+'/part-0.bin.gz',bytes:bytes.length,sha256:digest(bytes)}]}
 const objects=new Map([[prefix+'/manifest.json',Buffer.from(JSON.stringify(manifest))],[prefix+'/part-0.bin.gz',bytes]])
-const state={version:1,baseline:process.env.BOOTSTRAP!=='true',manifestPath:prefix+'/manifest.json',manifestSha256:digest(Buffer.from(JSON.stringify(manifest))),sourceFingerprint:scenario==='unchanged'?fingerprint(inventory):'0'.repeat(64),history:[]}
+const state={version:1,metadataSchemaVersion:2,baseline:process.env.BOOTSTRAP!=='true',manifestPath:prefix+'/manifest.json',manifestSha256:digest(Buffer.from(JSON.stringify(manifest))),sourceFingerprint:scenario==='unchanged'?fingerprint(inventory):'0'.repeat(64),history:[]}
+if(['metadata-migration','metadata-missing'].includes(scenario)){delete state.metadataSchemaVersion;state.sourceFingerprint=fingerprint(inventory)}
 globalThis.fetch=async(input,options={})=>{
   const u=new URL(input),method=options.method||'GET'
   trace.push({host:u.hostname,path:u.pathname,method,select:u.searchParams.get('select')})
@@ -40,6 +43,7 @@ globalThis.fetch=async(input,options={})=>{
     if(!name)throw Error('Unexpected fixture table')
     if(u.searchParams.get('select')==='id,updated_at')return result(u.searchParams.get('id')==='gt.0'?inventory[name]:[])
     if(scenario==='source-failure')return result({message:'must not appear in logs'},500)
+    if(scenario==='metadata-missing'&&u.searchParams.get('select')==='id,slug,updated_at,price,license')return result(data[name].map(({license,...r})=>r))
     return result(data[name])
   }
   if(u.pathname.includes('/object/list/')){

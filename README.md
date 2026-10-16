@@ -18,3 +18,7 @@ The website remains available from its last successful deployment when refresh f
 - Public `state` branch contains manifest path, SHA-256 and bounded budget bookkeeping, **not** records, credentials or URLs carrying secrets.
 
 Scheduling is best-effort, not continuous monitoring or an uptime guarantee. GitHub may suspend schedules in inactive public repositories. Free provider quotas still apply, including Supabase egress for website builds.
+
+## Price and license metadata
+
+Schema marker `metadataSchemaVersion: 2` prevents an older snapshot from being mistaken for an up-to-date one. On its first eligible refresh, an older copy is enriched with narrow, sequential reads of `id,slug,updated_at,price,license` for tools and `id,slug,updated_at,license` for prompts. It does not reread full article/prompt bodies just to add metadata. Identity, coverage, timestamps and nullable string values must match or publication stops. Normal request, byte, storage, consistency and publication-frequency budgets remain unchanged. Subsequent refreshes include these public fields in changed records and keep the cheap no-change path. No update is forced outside the existing schedule/budget.
