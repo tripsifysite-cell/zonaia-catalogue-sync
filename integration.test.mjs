@@ -6,18 +6,18 @@ import {tmpdir} from 'node:os'
 import {join,dirname,resolve,basename} from 'node:path'
 import {fileURLToPath,pathToFileURL} from 'node:url'
 const here=fileURLToPath(new URL('.',import.meta.url))
-for(const scenario of ['bootstrap','changed','unchanged','untrusted','source-failure','corrupt-roundtrip','upload-failure','storage-full']){
+for(const scenario of ['bootstrap','changed','unchanged','metadata-migration','metadata-missing','untrusted','source-failure','corrupt-roundtrip','upload-failure','storage-full']){
   test('bounded end-to-end simulation: '+scenario,()=>{
     const temp=mkdtempSync(join(tmpdir(),'catalogue-sync-test-')),traceFile=join(temp,'trace.json')
     try{
       const run=spawnSync(process.execPath,['--import',pathToFileURL(join(here,'integration-fixture.mjs')).href,'sync.mjs'],{cwd:here,encoding:'utf8',env:{...process.env,TEST_SCENARIO:scenario,TEST_TRACE:traceFile},timeout:20000})
       assert.equal(run.error,undefined)
       const trace=JSON.parse(readFileSync(traceFile,'utf8'))
-      const success=['bootstrap','changed','unchanged'].includes(scenario)
+      const success=['bootstrap','changed','unchanged','metadata-migration'].includes(scenario)
       assert.equal(run.status,success?0:1,run.stderr)
       const puts=trace.filter(r=>r.host==='api.github.com'&&r.method==='PUT')
       const hooks=trace.filter(r=>r.host==='api.cloudflare.com')
-      assert.equal(puts.length,['bootstrap','changed'].includes(scenario)?1:0)
+      assert.equal(puts.length,['bootstrap','changed','metadata-migration'].includes(scenario)?1:0)
       assert.equal(hooks.length,puts.length)
       if(scenario==='unchanged')assert.equal(trace.filter(r=>r.path.includes('/storage/')).length,0)
       if(scenario==='changed'){
@@ -25,6 +25,7 @@ for(const scenario of ['bootstrap','changed','unchanged','untrusted','source-fai
         assert.equal(bodies.length,1)
         assert.equal(bodies[0].path,'/rest/v1/ias')
       }
+      if(scenario==='metadata-migration'){const bodies=trace.filter(r=>r.path.startsWith('/rest/')&&r.select!=='id,updated_at');assert.equal(bodies.length,2);assert.deepEqual(bodies.map(r=>r.select),['id,slug,updated_at,price,license','id,slug,updated_at,license'])}
       if(scenario==='untrusted')assert.equal(trace.length,0)
       assert.equal((run.stderr+run.stdout).includes('must not appear in logs'),false)
       assert.equal((run.stderr+run.stdout).includes('test-only'),false)
