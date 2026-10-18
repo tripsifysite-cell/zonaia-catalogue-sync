@@ -2,6 +2,17 @@ import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {tables,id,mergeRows,encodeSnapshot,decodeSnapshot,digest,checkBudget} from './core.mjs'
 const row=(id,updated_at='2026-10-16T00:00:00Z')=>({id,slug:'item-'+id,created_at:null,updated_at})
+test('authorized draft stays out of serialized snapshots without removing legacy news',()=>{
+  const slug='como-usar-labs-y-warn-para-automatizar-trabajo-real-con-ia'
+  const data={ias:[row(1)],prompts:[row(2)],blog:[row(3),{...row(4),slug,article_html:'EDITORIAL_HOLD_TEST'}]}
+  const {snapshot,bytes}=encodeSnapshot(data,'2026-10-18T21:50:00Z')
+  assert.equal(snapshot.counts.blog,1)
+  assert.deepEqual(snapshot.blog.map(r=>r.slug),['item-3'])
+  assert.equal(data.blog.length,2)
+  const restored=decodeSnapshot(bytes,digest(bytes))
+  assert.equal(JSON.stringify(restored).includes('EDITORIAL_HOLD_TEST'),false)
+  assert.equal(JSON.stringify(restored).includes(slug),false)
+})
 test('merge adds, edits, deletes and preserves publication order',()=>{
   const a=row(1),b=row(2),c=row(3)
   const result=mergeRows([a,b],[{id:2,updated_at:b.updated_at},{id:3,updated_at:c.updated_at}],[c],tables.ias)
