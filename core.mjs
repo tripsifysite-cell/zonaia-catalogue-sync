@@ -8,6 +8,9 @@ export const tables = {
 }
 export const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 export const metadataFields={ias:['price','license'],prompts:['license']}
+// Explicit hold for the single authorized import test, pending editorial review.
+// Preserve legacy news: this is not a retroactive publication-state migration.
+export const editorialHoldSlugs = new Set(['como-usar-labs-y-warn-para-automatizar-trabajo-real-con-ia'])
 export function mergeMetadata(rows,extra,fields){const map=new Map(extra.map(r=>[id(r.id),r]));if(map.size!==rows.length||extra.length!==rows.length)throw Error('METADATA_COVERAGE');return rows.map(row=>{const r=map.get(id(row.id));if(!r||r.slug!==row.slug||r.updated_at!==row.updated_at)throw Error('METADATA_IDENTITY');const next={...row};for(const field of fields){if(!Object.hasOwn(r,field)||(r[field]!==null&&typeof r[field]!=='string'))throw Error('METADATA_FIELD');next[field]=r[field]}return next})}
 export function id(value) {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) throw Error('Unsafe numeric identifier')
@@ -58,7 +61,8 @@ export function mergeRows(oldRows, inventory, changes, config) {
 export function encodeSnapshot(data, now) {
   const snapshot = { version: 1, exportedAt: now, counts: {}, ...data }
   for (const [name, config] of Object.entries(tables)) {
-    const rows = data[name]
+    const rows = name === 'blog' ? data[name].filter(row => !editorialHoldSlugs.has(row.slug)) : data[name]
+    snapshot[name] = rows
     const inventory = rows.map(r => ({id:r.id,updated_at:r.updated_at})).sort((a,b)=>BigInt(id(a.id)) < BigInt(id(b.id)) ? -1:1)
     mergeRows([], inventory, rows, config)
     snapshot.counts[name] = rows.length
