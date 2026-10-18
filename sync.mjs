@@ -1,4 +1,4 @@
-import {tables,id,fingerprint,validateInventory,mergeRows,encodeSnapshot,decodeSnapshot,digest,checkBudget,validatePin} from './core.mjs'
+import {tables,id,fingerprint,validateInventory,mergeRows,encodeSnapshot,decodeSnapshot,digest,checkBudget,validatePin,metadataFields,mergeMetadata} from './core.mjs'
 
 const repository='tripsifysite-cell/zonaia-catalogue-sync'
 const bucket='zonaia-build-snapshots'
@@ -57,7 +57,7 @@ try {
   }
   stage='inventory'
   const before=await inventory(),sourceFingerprint=fingerprint(before)
-  if(!bootstrap&&sourceFingerprint===state.sourceFingerprint){
+  if(!bootstrap&&state.metadataSchemaVersion===2&&sourceFingerprint===state.sourceFingerprint){
     const marker=await json('https://www.zonaia.com.ar/catalogue-version.json',{},10000)
     if(marker.manifestSha256!==state.manifestSha256)throw Error('PREVIOUS_DEPLOYMENT_PENDING')
     console.log(JSON.stringify({stage:'unchanged',requests,receivedBytes:received,publication:false}));process.exit(0)
@@ -113,6 +113,12 @@ try {
     }
     data[name]=mergeRows(old,before[name],changes,config)
   }
+  for(const [name,fields] of Object.entries(metadataFields)){
+    if(data[name].every(row=>fields.every(field=>Object.hasOwn(row,field))))continue
+    stage=`metadata-${name}`;const extra=[];let after='0';const config=tables[name]
+    while(true){const params=new URLSearchParams({select:['id','slug','updated_at',...fields].join(','),order:'id.asc',limit:'1000',id:`gt.${after}`});const bytes=await request(`${base}/rest/v1/${config.table}?${params}`,{headers},1000000);sourceBytes+=bytes.length;if(sourceBytes>(bootstrap?380000000:60000000))throw Error('SOURCE_BUDGET');const batch=JSON.parse(bytes);if(!Array.isArray(batch)||batch.length>1000)throw Error('METADATA_RESPONSE');for(const row of batch){if(BigInt(id(row.id))<=BigInt(after))throw Error('METADATA_PROGRESS');after=id(row.id);extra.push(row)}if(extra.length>=config.max)throw Error('ROW_BUDGET');if(batch.length<1000)break}
+    data[name]=mergeMetadata(data[name],extra,fields)
+  }
   stage='consistency'
   if(fingerprint(await inventory())!==sourceFingerprint)throw Error('SOURCE_CHANGED_DURING_READ')
   stage='encode'
@@ -135,7 +141,7 @@ try {
   stage='roundtrip'
   const verified=await download({version:1,manifestPath,manifestSha256})
   for(const name of Object.keys(tables))if(verified.counts[name]!==snapshot.counts[name])throw Error('ROUNDTRIP_MISMATCH')
-  const next={version:1,baseline:true,manifestPath,manifestSha256,sourceFingerprint,lastPublication:at,history:[...history,{at,egressBytes:estimated}]}
+  const next={version:1,metadataSchemaVersion:2,baseline:true,manifestPath,manifestSha256,sourceFingerprint,lastPublication:at,history:[...history,{at,egressBytes:estimated}]}
   stage='publish-pin'
   const latest=await json(`${gh}/contents/state.json?ref=state`,ghOptions())
   if(latest.sha!==stateFile.sha)throw Error('PUBLICATION_STATE_CHANGED')

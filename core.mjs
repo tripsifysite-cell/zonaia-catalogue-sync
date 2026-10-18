@@ -2,11 +2,13 @@ import { createHash } from 'node:crypto'
 import { gzipSync, gunzipSync } from 'node:zlib'
 
 export const tables = {
-  ias: { table: 'ias', max: 50000, fields: 'id,name,slug,primary_category,short_description,long_description,url,screenshot_imgbb_url,logo_imgbb_url,screenshot_url,logo_url,created_at,updated_at' },
-  prompts: { table: 'prompts', max: 30000, fields: 'id,title,slug,prompt,ai_model,category,image_url,source_url,type,created_at,updated_at' },
+  ias: { table: 'ias', max: 50000, fields: 'id,name,slug,primary_category,price,license,short_description,long_description,url,screenshot_imgbb_url,logo_imgbb_url,screenshot_url,logo_url,created_at,updated_at' },
+  prompts: { table: 'prompts', max: 30000, fields: 'id,title,slug,prompt,ai_model,category,image_url,source_url,license,type,created_at,updated_at' },
   blog: { table: 'blog_posts', max: 500, fields: 'id,title,slug,category,excerpt,article_html,image_imgbb_url,image_url,source_url,created_at,updated_at' },
 }
 export const digest = bytes => createHash('sha256').update(bytes).digest('hex')
+export const metadataFields={ias:['price','license'],prompts:['license']}
+export function mergeMetadata(rows,extra,fields){const map=new Map(extra.map(r=>[id(r.id),r]));if(map.size!==rows.length||extra.length!==rows.length)throw Error('METADATA_COVERAGE');return rows.map(row=>{const r=map.get(id(row.id));if(!r||r.slug!==row.slug||r.updated_at!==row.updated_at)throw Error('METADATA_IDENTITY');const next={...row};for(const field of fields){if(!Object.hasOwn(r,field)||(r[field]!==null&&typeof r[field]!=='string'))throw Error('METADATA_FIELD');next[field]=r[field]}return next})}
 export function id(value) {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) throw Error('Unsafe numeric identifier')
   const result = String(value)
