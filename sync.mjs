@@ -41,7 +41,7 @@ try {
     for(const [name,config] of Object.entries(tables)){
       const rows=[];let after='0'
       while(true){
-        const params=new URLSearchParams({select:'id,updated_at',order:'id.asc',limit:'1000',id:`gt.${after}`})
+        const params=new URLSearchParams({select:name==='blog'?'id,updated_at,status':'id,updated_at',order:'id.asc',limit:'1000',id:`gt.${after}`})
         const bytes=await request(`${base}/rest/v1/${config.table}?${params}`,{headers},1000000)
         sourceBytes+=bytes.length
         if(sourceBytes>(bootstrap?380000000:60000000))throw Error('SOURCE_BUDGET')
@@ -99,7 +99,7 @@ try {
   for(const [name,config] of Object.entries(tables)){
     stage=`changes-${name}`
     const old=previous[name]||[],map=new Map(old.map(r=>[id(r.id),r]))
-    const changed=before[name].filter(r=>!map.has(id(r.id))||map.get(id(r.id)).updated_at!==r.updated_at)
+    const changed=before[name].filter(r=>!map.has(id(r.id))||map.get(id(r.id)).updated_at!==r.updated_at||(name==='blog'&&map.get(id(r.id)).status!==r.status))
     const changes=[]
     for(let offset=0;offset<changed.length;offset+=50){
       const batch=changed.slice(offset,offset+50)

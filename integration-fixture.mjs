@@ -16,12 +16,14 @@ process.env.PAGES_DEPLOY_HOOK='https://api.cloudflare.com/client/v4/pages/webhoo
 process.env.BOOTSTRAP=['bootstrap','source-failure','corrupt-roundtrip','upload-failure','storage-full'].includes(scenario)?'true':'false'
 const timestamp='2026-10-15T00:00:00Z'
 const row=(n)=>({id:n,slug:'sample-'+n,created_at:timestamp,updated_at:timestamp,...(n===1?{price:'Gratis',license:'MIT'}:n===2?{license:null}:{})})
-const data={ias:[row(1)],prompts:[row(2)],blog:[row(3)]}
+const data={ias:[row(1)],prompts:[row(2)],blog:[{...row(3),status:'Publicado'}]}
+if(scenario==='editorial-status')data.blog.push({...row(4),status:'Publicado'})
 const baselineData=structuredClone(data)
 if(['metadata-migration','metadata-missing'].includes(scenario)){for(const r of baselineData.ias){delete r.price;delete r.license}for(const r of baselineData.prompts)delete r.license}
 const {snapshot,bytes}=encodeSnapshot(baselineData,timestamp)
 if(scenario==='changed')data.ias=[{...row(1),updated_at:'2026-10-16T00:00:00Z'}]
-const inventory=Object.fromEntries(Object.entries(data).map(([k,rows])=>[k,rows.map(r=>({id:r.id,updated_at:r.updated_at}))]))
+if(scenario==='editorial-status')data.blog[0].status='Borrador'
+const inventory=Object.fromEntries(Object.entries(data).map(([k,rows])=>[k,rows.map(r=>({id:r.id,updated_at:r.updated_at,...(k==='blog'?{status:r.status}:{})}))]))
 const prefix='v1/20261015-1234567890abcdef'
 const manifest={version:1,sha256:digest(bytes),compressedBytes:bytes.length,chunks:[{path:prefix+'/part-0.bin.gz',bytes:bytes.length,sha256:digest(bytes)}]}
 const objects=new Map([[prefix+'/manifest.json',Buffer.from(JSON.stringify(manifest))],[prefix+'/part-0.bin.gz',bytes]])
@@ -41,10 +43,11 @@ globalThis.fetch=async(input,options={})=>{
   if(u.pathname.startsWith('/rest/v1/')){
     const config=Object.values(tables).find(t=>u.pathname.endsWith('/'+t.table)),name=Object.keys(tables).find(k=>tables[k]===config)
     if(!name)throw Error('Unexpected fixture table')
-    if(u.searchParams.get('select')==='id,updated_at')return result(u.searchParams.get('id')==='gt.0'?inventory[name]:[])
+    if(['id,updated_at','id,updated_at,status'].includes(u.searchParams.get('select')))return result(u.searchParams.get('id')==='gt.0'?inventory[name]:[])
     if(scenario==='source-failure')return result({message:'must not appear in logs'},500)
     if(scenario==='metadata-missing'&&u.searchParams.get('select')==='id,slug,updated_at,price,license')return result(data[name].map(({license,...r})=>r))
-    return result(data[name])
+    const requested=u.searchParams.get('id')
+    return result(requested?.startsWith('in.(')?data[name].filter(r=>requested.slice(4,-1).split(',').includes(String(r.id))):data[name])
   }
   if(u.pathname.includes('/object/list/')){
     const body=JSON.parse(options.body)
