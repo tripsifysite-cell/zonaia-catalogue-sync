@@ -1,14 +1,19 @@
 {
   "version": 1,
+  "metadataSchemaVersion": 2,
   "baseline": true,
-  "manifestPath": "v1/20261015-599cf9b85a72080d/manifest.json",
-  "manifestSha256": "a5e6acbea2d6d20584c94be05cf044f8f07cbfe33c65d3a9b319db0325aa66ef",
-  "sourceFingerprint": "17fe7f5ce977c77c3441fb899478361628a365106b4fedd33a124fc5309e977b",
-  "lastPublication": "2026-10-15T23:06:53.704Z",
+  "manifestPath": "v1/20261022-b06a1d129d80f17a/manifest.json",
+  "manifestSha256": "d7caff2a3d1bf74fe1776ece1e86d61d6332d333bdf9adb2fd044be3ce987ea6",
+  "sourceFingerprint": "e5a16473d60839f53471ad046eb99901377d70e9429d511fc159424d6d81ede3",
+  "lastPublication": "2026-10-22T23:34:49.745Z",
   "history": [
     {
       "at": "2026-10-15T23:06:53.704Z",
       "egressBytes": 478279589
+    },
+    {
+      "at": "2026-10-22T23:34:49.745Z",
+      "egressBytes": 257100347
     }
   ]
 }
